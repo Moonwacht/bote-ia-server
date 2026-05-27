@@ -30,7 +30,7 @@ def classify(payload: ImagePayload):
         "contents": [{
             "parts": [
                 {
-                    "text": "Look at this image. The background is a solid aqua/teal colored surface and must be completely ignored. Only classify the waste object placed ON the background. If there is no object visible and you only see the aqua background, reply with only the word 'empty'. If there is an object, reply with only 'organic' if it is food, plants, or biodegradable material, or only 'inorganic' if it is plastic, metal, glass, paper, or any non-biodegradable material. One word only, lowercase, no punctuation, no explanation."
+                    "text": "Look at this image. There is a solid colored background that you must ignore completely. Focus ONLY on identifying a physical waste object in the image. If you see a clear, distinct physical object (food, fruit, vegetable, paper, plastic, metal, glass, can, bottle, wrapper, etc), classify it. Reply 'organic' for food/plants/biodegradable. Reply 'inorganic' for plastic/metal/glass/paper/non-biodegradable. Reply 'empty' ONLY if there is absolutely no physical object visible at all. One word only, lowercase."
                 },
                 {
                     "inline_data": {
