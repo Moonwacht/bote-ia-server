@@ -11,8 +11,12 @@ app = FastAPI()
 # OPENAI
 # ═══════════════════════════════════════
 
+api_key = os.environ.get("OPENAI_API_KEY")
+
+print("API KEY DETECTADA:", api_key)
+
 client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")
+    api_key=api_key
 )
 
 MODEL = "gpt-4o-mini"
