@@ -23,7 +23,7 @@ def classify(payload: ImagePayload):
         "contents": [{
             "parts": [
                 {
-                    "text": "Look at this image. Classify the waste item as exactly one word, lowercase only. Reply with only 'organic' if it is food, plants, or biodegradable material. Reply with only 'inorganic' if it is plastic, metal, glass, paper, or any non-biodegradable material. No other words, no punctuation, no explanation."
+                    "text": "Look at this image. The background is a solid aqua/teal colored surface and must be completely ignored. Only classify the waste object placed ON the background. If there is no object visible and you only see the aqua background, reply with only the word 'empty'. If there is an object, reply with only 'organic' if it is food, plants, or biodegradable material, or only 'inorganic' if it is plastic, metal, glass, paper, or any non-biodegradable material. One word only, lowercase, no punctuation, no explanation."
                 },
                 {
                     "inline_data": {
@@ -49,12 +49,14 @@ def classify(payload: ImagePayload):
         text = result["candidates"][0]["content"]["parts"][0]["text"]
         text = text.strip().lower()
 
-        if "organic" in text and "inorganic" not in text:
-            return {"type": "organic"}
-        elif "inorganic" in text:
-            return {"type": "inorganic"}
-        else:
-            return {"type": "unknown", "raw": text}
+        if "empty" in text:
+    return {"type": "empty"}
+elif "organic" in text and "inorganic" not in text:
+    return {"type": "organic"}
+elif "inorganic" in text:
+    return {"type": "inorganic"}
+else:
+    return {"type": "unknown", "raw": text}
 
     except Exception as e:
         print("Error completo:", str(e), "Response:", response.text if 'response' in locals() else "sin respuesta")
