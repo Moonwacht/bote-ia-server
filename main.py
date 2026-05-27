@@ -17,6 +17,9 @@ def health():
 
 @app.post("/classify")
 def classify(payload: ImagePayload):
+    # Limpiar el Base64 de cualquier caracter extraño
+    clean_image = payload.image.replace("\n", "").replace("\r", "").replace(" ", "").strip()
+
     body = {
         "contents": [{
             "parts": [
@@ -26,7 +29,7 @@ def classify(payload: ImagePayload):
                 {
                     "inline_data": {
                         "mime_type": "image/jpeg",
-                        "data": payload.image
+                        "data": clean_image
                     }
                 }
             ]
@@ -40,6 +43,10 @@ def classify(payload: ImagePayload):
             timeout=15
         )
         result = response.json()
+
+        # Log completo para debug
+        print("Gemini raw response:", result)
+
         text = result["candidates"][0]["content"]["parts"][0]["text"]
         text = text.strip().lower()
 
@@ -51,4 +58,5 @@ def classify(payload: ImagePayload):
             return {"type": "unknown", "raw": text}
 
     except Exception as e:
+        print("Error completo:", str(e), "Response:", response.text if 'response' in locals() else "sin respuesta")
         return {"type": "error", "detail": str(e)}
