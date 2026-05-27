@@ -2,18 +2,43 @@ import os
 import requests
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-2.5-flash-lite:generateContent"
+)
 
 class ImagePayload(BaseModel):
     image: str
 
+
+# ═══════════════════════════════════════
+# CODIGOS DEL SISTEMA
+# ═══════════════════════════════════════
+
+ORGANIC_CODE   = "000101"
+INORGANIC_CODE = "000110"
+EMPTY_CODE     = "000000"
+ERROR_CODE     = "111111"
+
+
+# ═══════════════════════════════════════
+# HEALTH CHECK
+# ═══════════════════════════════════════
+
 @app.get("/")
 def health():
     return {"status": "ok"}
+
+
+# ═══════════════════════════════════════
+# LISTAR MODELOS
+# ═══════════════════════════════════════
 
 @app.get("/modelos")
 def listar_modelos():
@@ -22,15 +47,60 @@ def listar_modelos():
     )
     return response.json()
 
-@app.post("/classify")
+
+# ═══════════════════════════════════════
+# CLASIFICACION
+# ═══════════════════════════════════════
+
+@app.post("/classify", response_class=PlainTextResponse)
 def classify(payload: ImagePayload):
-    clean_image = payload.image.replace("\n", "").replace("\r", "").replace(" ", "").strip()
+
+    # limpiar base64
+    clean_image = (
+        payload.image
+        .replace("\n", "")
+        .replace("\r", "")
+        .replace(" ", "")
+        .strip()
+    )
+
+    # prompt optimizado
+    prompt = """
+You are an embedded waste classification system.
+
+Analyze ONLY the main physical object in the image.
+
+Ignore:
+- background
+- walls
+- hands
+- shadows
+- table
+- empty colored surfaces
+
+Return ONLY ONE of these exact codes:
+
+000101 = organic waste
+000110 = inorganic waste
+000000 = empty / no object
+111111 = error / uncertain
+
+Rules:
+- food, fruit, vegetables, plants = 000101
+- plastic, metal, glass, paper, cans, wrappers = 000110
+- absolutely no visible object = 000000
+
+DO NOT explain.
+DO NOT use JSON.
+DO NOT add text.
+ONLY return the exact 6-digit code.
+"""
 
     body = {
         "contents": [{
             "parts": [
                 {
-                    "text": "Look at this image. There is a solid colored background that you must ignore completely. Focus ONLY on identifying a physical waste object in the image. If you see a clear, distinct physical object (food, fruit, vegetable, paper, plastic, metal, glass, can, bottle, wrapper, etc), classify it. Reply 'organic' for food/plants/biodegradable. Reply 'inorganic' for plastic/metal/glass/paper/non-biodegradable. Reply 'empty' ONLY if there is absolutely no physical object visible at all. One word only, lowercase."
+                    "text": prompt
                 },
                 {
                     "inline_data": {
@@ -43,26 +113,47 @@ def classify(payload: ImagePayload):
     }
 
     try:
+
         response = requests.post(
             f"{GEMINI_URL}?key={GEMINI_API_KEY}",
             json=body,
             timeout=30
         )
+
         result = response.json()
-        print("Gemini raw response:", result)
 
+        print("═══════════════════════════════")
+        print("Gemini RAW response:")
+        print(result)
+        print("═══════════════════════════════")
+
+        # extraer texto
         text = result["candidates"][0]["content"]["parts"][0]["text"]
-        text = text.strip().lower()
 
-        if "empty" in text:
-            return {"type": "empty"}
-        elif "organic" in text and "inorganic" not in text:
-            return {"type": "organic"}
-        elif "inorganic" in text:
-            return {"type": "inorganic"}
-        else:
-            return {"type": "unknown", "raw": text}
+        text = text.strip()
+
+        print("Codigo recibido:", text)
+
+        # validar codigos permitidos
+        valid_codes = [
+            ORGANIC_CODE,
+            INORGANIC_CODE,
+            EMPTY_CODE,
+            ERROR_CODE
+        ]
+
+        if text not in valid_codes:
+            print("Codigo invalido detectado")
+            return ERROR_CODE
+
+        return text
 
     except Exception as e:
-        print("Error completo:", str(e), "Response:", response.text if 'response' in locals() else "sin respuesta")
-        return {"type": "error", "detail": str(e)}
+
+        print("ERROR COMPLETO:")
+        print(str(e))
+
+        if 'response' in locals():
+            print(response.text)
+
+        return ERROR_CODE
