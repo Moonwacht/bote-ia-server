@@ -1,5 +1,5 @@
+```python
 import os
-import base64
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
@@ -38,7 +38,7 @@ class ImagePayload(BaseModel):
     image: str
 
 # ═══════════════════════════════════════
-# HEALTH
+# HEALTH CHECK
 # ═══════════════════════════════════════
 
 @app.get("/")
@@ -54,6 +54,7 @@ def classify(payload: ImagePayload):
 
     try:
 
+        # limpiar base64
         clean_image = (
             payload.image
             .replace("\n", "")
@@ -64,24 +65,8 @@ def classify(payload: ImagePayload):
 
         image_url = f"data:image/jpeg;base64,{clean_image}"
 
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-You are an embedded waste classification system.
-
-Analyze ONLY the main object.
-
-Ignore:
-- background
-- walls
-- hands
-- shadows
-- tables
-
-"""
+        # PROMPT MEJORADO
+        prompt = """
 You are a strict embedded waste classification system.
 
 The image normally contains a plain blue background.
@@ -126,6 +111,13 @@ Rules:
 DO NOT explain.
 ONLY return the exact code.
 """
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt
                 },
                 {
                     "role": "user",
@@ -148,6 +140,7 @@ ONLY return the exact code.
         print("Codigo IA:", text)
         print("═══════════════════════════════")
 
+        # validar códigos
         valid_codes = [
             ORGANIC_CODE,
             INORGANIC_CODE,
@@ -167,3 +160,4 @@ ONLY return the exact code.
         print(str(e))
 
         return ERROR_CODE
+```
