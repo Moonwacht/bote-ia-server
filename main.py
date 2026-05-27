@@ -7,6 +7,7 @@ app = FastAPI()
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+
 class ImagePayload(BaseModel):
     image: str
 
@@ -14,9 +15,15 @@ class ImagePayload(BaseModel):
 def health():
     return {"status": "ok"}
 
+@app.get("/modelos")
+def listar_modelos():
+    response = requests.get(
+        f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    )
+    return response.json()
+
 @app.post("/classify")
 def classify(payload: ImagePayload):
-    # Limpiar el Base64 de cualquier caracter extraño
     clean_image = payload.image.replace("\n", "").replace("\r", "").replace(" ", "").strip()
 
     body = {
@@ -39,24 +46,22 @@ def classify(payload: ImagePayload):
         response = requests.post(
             f"{GEMINI_URL}?key={GEMINI_API_KEY}",
             json=body,
-            timeout=35
+            timeout=30
         )
         result = response.json()
-
-        # Log completo para debug
         print("Gemini raw response:", result)
 
         text = result["candidates"][0]["content"]["parts"][0]["text"]
         text = text.strip().lower()
 
         if "empty" in text:
-    return {"type": "empty"}
-elif "organic" in text and "inorganic" not in text:
-    return {"type": "organic"}
-elif "inorganic" in text:
-    return {"type": "inorganic"}
-else:
-    return {"type": "unknown", "raw": text}
+            return {"type": "empty"}
+        elif "organic" in text and "inorganic" not in text:
+            return {"type": "organic"}
+        elif "inorganic" in text:
+            return {"type": "inorganic"}
+        else:
+            return {"type": "unknown", "raw": text}
 
     except Exception as e:
         print("Error completo:", str(e), "Response:", response.text if 'response' in locals() else "sin respuesta")
