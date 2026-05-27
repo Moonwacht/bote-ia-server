@@ -1,24 +1,24 @@
 import os
-import requests
+import base64
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
+from openai import OpenAI
 
 app = FastAPI()
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# ═══════════════════════════════════════
+# OPENAI
+# ═══════════════════════════════════════
 
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.5-flash-lite:generateContent"
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY")
 )
 
-class ImagePayload(BaseModel):
-    image: str
-
+MODEL = "gpt-4o-mini"
 
 # ═══════════════════════════════════════
-# CODIGOS DEL SISTEMA
+# CODIGOS
 # ═══════════════════════════════════════
 
 ORGANIC_CODE   = "000101"
@@ -26,27 +26,20 @@ INORGANIC_CODE = "000110"
 EMPTY_CODE     = "000000"
 ERROR_CODE     = "111111"
 
+# ═══════════════════════════════════════
+# REQUEST MODEL
+# ═══════════════════════════════════════
+
+class ImagePayload(BaseModel):
+    image: str
 
 # ═══════════════════════════════════════
-# HEALTH CHECK
+# HEALTH
 # ═══════════════════════════════════════
 
 @app.get("/")
 def health():
     return {"status": "ok"}
-
-
-# ═══════════════════════════════════════
-# LISTAR MODELOS
-# ═══════════════════════════════════════
-
-@app.get("/modelos")
-def listar_modelos():
-    response = requests.get(
-        f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
-    )
-    return response.json()
-
 
 # ═══════════════════════════════════════
 # CLASIFICACION
@@ -55,86 +48,72 @@ def listar_modelos():
 @app.post("/classify", response_class=PlainTextResponse)
 def classify(payload: ImagePayload):
 
-    # limpiar base64
-    clean_image = (
-        payload.image
-        .replace("\n", "")
-        .replace("\r", "")
-        .replace(" ", "")
-        .strip()
-    )
+    try:
 
-    # prompt optimizado
-    prompt = """
+        clean_image = (
+            payload.image
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace(" ", "")
+            .strip()
+        )
+
+        image_url = f"data:image/jpeg;base64,{clean_image}"
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are an embedded waste classification system.
 
-Analyze ONLY the main physical object in the image.
+Analyze ONLY the main object.
 
 Ignore:
 - background
 - walls
 - hands
 - shadows
-- table
-- empty colored surfaces
+- tables
 
-Return ONLY ONE of these exact codes:
+Return ONLY ONE exact code:
 
-000101 = organic waste
-000110 = inorganic waste
-000000 = empty / no object
-111111 = error / uncertain
+000101 = organic
+000110 = inorganic
+000000 = empty
+111111 = error
 
 Rules:
 - food, fruit, vegetables, plants = 000101
 - plastic, metal, glass, paper, cans, wrappers = 000110
-- absolutely no visible object = 000000
+- no visible object = 000000
 
 DO NOT explain.
-DO NOT use JSON.
-DO NOT add text.
-ONLY return the exact 6-digit code.
+ONLY return the code.
 """
-
-    body = {
-        "contents": [{
-            "parts": [
-                {
-                    "text": prompt
                 },
                 {
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": clean_image
-                    }
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_url
+                            }
+                        }
+                    ]
                 }
-            ]
-        }]
-    }
-
-    try:
-
-        response = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-            json=body,
-            timeout=30
+            ],
+            max_tokens=10
         )
 
-        result = response.json()
+        text = response.choices[0].message.content.strip()
 
         print("═══════════════════════════════")
-        print("Gemini RAW response:")
-        print(result)
+        print("Codigo IA:", text)
         print("═══════════════════════════════")
 
-        # extraer texto
-        text = result["candidates"][0]["content"]["parts"][0]["text"]
-
-        text = text.strip()
-
-        print("Codigo recibido:", text)
-
-        # validar codigos permitidos
         valid_codes = [
             ORGANIC_CODE,
             INORGANIC_CODE,
@@ -143,17 +122,14 @@ ONLY return the exact 6-digit code.
         ]
 
         if text not in valid_codes:
-            print("Codigo invalido detectado")
+            print("Codigo invalido")
             return ERROR_CODE
 
         return text
 
     except Exception as e:
 
-        print("ERROR COMPLETO:")
+        print("ERROR:")
         print(str(e))
-
-        if 'response' in locals():
-            print(response.text)
 
         return ERROR_CODE
