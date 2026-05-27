@@ -39,7 +39,7 @@ def classify(payload: ImagePayload):
         response = requests.post(
             f"{GEMINI_URL}?key={GEMINI_API_KEY}",
             json=body,
-            timeout=15
+            timeout=35
         )
         result = response.json()
 
