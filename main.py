@@ -1,4 +1,3 @@
-```python
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -160,4 +159,3 @@ ONLY return the exact code.
         print(str(e))
 
         return ERROR_CODE
-```
